@@ -1,0 +1,13 @@
+# 依赖目录（本插件无运行时依赖，仅为保险）
+node_modules/
+
+# 日志与编辑器临时文件
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 发布产物
+*.tgz

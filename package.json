@@ -1,0 +1,50 @@
+{
+  "name": "dsh-to-chinese",
+  "version": "1.0.0",
+  "description": "Adds a ToChinese action to a right-Sidebar file tab's menu: it produces a bilingual English + Chinese copy of the open document, sentence by sentence, and opens the -cn sibling in the same tab slot.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ganttfly/dsh-to-chinese.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Ganttfly/dsh-to-chinese/issues"
+  },
+  "homepage": "https://github.com/Ganttfly/dsh-to-chinese#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "translation",
+    "chinese",
+    "bilingual",
+    "markdown"
+  ],
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}
