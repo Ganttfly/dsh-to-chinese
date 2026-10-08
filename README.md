@@ -1,8 +1,13 @@
-# ToChinese — 中英对照翻译
+# dsh-to-chinese — 中英对照 / 纯中文翻译
 
-在右侧边栏的**文件标签页菜单**里加一项「翻译成中文（中英对照）」。点击后立刻开一个标签页显示进度，完成后在**同一个位置**换成生成的中英对照文档。
+在右侧边栏的**文件标签页菜单**里加两项：「To Chinese」只保留中文译文，「To Chinese (bilingual)」生成中英逐句对照。点击后立刻开一个标签页显示进度，完成后在**同一个位置**换成生成的中文文档。
 
-源文件 `foo.md` → 生成 `foo-cn.md`（英文原文一句 + 中文译文一句，逐句交替），并在新标签页打开。
+源文件 `foo.md` →
+
+- 「To Chinese」→ `foo-zh.md`（只有中文译文）
+- 「To Chinese (bilingual)」→ `foo-cn.md`（英文原文一句 + 中文译文一句，逐句交替）
+
+两者各用一个 tab 类型，所以同一个文件的两种译文可以并排打开。
 
 ```
 点击菜单项
@@ -348,8 +353,8 @@ ctx.effect(
   → ctx.fs.resolve(path, { cwd })               解析成真实路径
   → ctx.fs.stat(target)                         确认存在
   → ctx.fs.readText(target)                     读全文
-  → translateBilingual(...)                     调模型
-  → chineseSiblingPath(path)                    算出 foo-cn.md
+  → translateDocument(…, mode)                  调模型（mode 决定提示词）
+  → siblingPath(path, suffix)                   算出 foo-cn.md / foo-zh.md
   → ctx.sandboxPolicy.resolve({ session })      ★ 拿沙箱策略
   → ctx.fs.writeText(target, text, …, policy)   ★ 写，带策略
   → 返回 { ok, address: 新地址, path, bytes }
@@ -481,8 +486,8 @@ const a = 1
 | `inject` | 依赖服务：`webServer`、`fs`、`sessions`、`sandboxPolicy`、`llm`、`agentDefaultModel` |
 | `TRANSLATE_PATH` | `/to-chinese/translate` |
 | `parseFileAddress(address)` | 解析 `dsh-resource://file/…` → `{ scope, sessionId?, path }` |
-| `chineseSiblingPath(path)` | `foo/bar.md` → `foo/bar-cn.md` |
-| `chineseSiblingAddress(address)` | 地址层面同样处理，保留编码与作用域 |
+| `siblingPath(path, suffix)` | `foo/bar.md` + `-cn` → `foo/bar-cn.md`；`-zh` → `foo/bar-zh.md` |
+| `siblingAddress(address, suffix)` | 地址层面同样处理，保留编码与作用域 |
 | `protectVerbatim(source)` | 抽出 front matter 与代码块 → `{ text, values }` |
 | `restoreVerbatim(text, values)` | 还原并校验，占位符丢失/重复则抛错 |
 | `apply(ctx)` | 挂载路由 |
@@ -494,11 +499,13 @@ const a = 1
 | 名称 | 说明 |
 |---|---|
 | `TranslateBadge` | 翻译徽标：圆角方块 + 挖空的「文」「A」（SVG mask，跟随 `currentColor`） |
-| `TabMenuEntry` | 菜单行；读 `tab.contentId` 决定显不显示 |
-| `TranslateTab` | tab body；`props.useTabInfo()` 拿 `tab`，跑任务，成功后 `replaceTab` |
+| `TabMenuEntry(props)` | 菜单行（模式由 `props.mode` 决定）；读 `tab.contentId` 决定显不显示 |
+| `ZhTabMenuEntry` | 「To Chinese」那一行：同一组件、换成 `zh` 模式 |
+| `TranslateTab` | tab body；`props.useTabInfo()` 拿 `tab`，模式取自 `tab.navigation.params.mode` |
 | `FallbackPill` | 兜底错误胶囊 |
 | `createErrorStore` | 极简可观察 store，兜底胶囊读它 |
-| `CSS` | 全部样式；菜单行照抄设计系统 `Menu.module.css` 的 `.item` |
+| `MODES` | 两种模式各自的行 id / tab 类型 / 文案 key |
+| `CSS` | 全部样式；菜单行照抄 dockkit 标签菜单自己的 `DockKit.module.css` `.menuItem` |
 
 ---
 

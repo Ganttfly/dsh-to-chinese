@@ -2,9 +2,11 @@
  * dsh-to-chinese — Host half.
  *
  * Owns the one endpoint the Client half calls: given a `dsh-resource://file/…`
- * address, read that file, produce a **bilingual** copy — each original English
- * sentence immediately followed by its Simplified Chinese translation — write
- * the `<name>-cn<ext>` sibling next to it, and answer with the new file's own
+ * address and a mode, read that file and write the translation next to it.
+ * `bilingual` (the default) produces a reading copy — each original English
+ * sentence immediately followed by its Simplified Chinese translation — in the
+ * `<name>-cn<ext>` sibling; `zh` produces the Chinese text alone in the
+ * `<name>-zh<ext>` sibling. Either way the answer carries the new file's own
  * address so the Client can open it in a tab.
  *
  * Structure is protected rather than trusted to the model: YAML front matter and
@@ -47,8 +49,8 @@ function keepPattern(index) {
   return new RegExp(`<!--\\s*KEEP\\s*:\\s*${index}\\s*-->`, 'g')
 }
 
-/** Instruction for the translation call: bilingual reading copy, structure intact. */
-const SYSTEM_PROMPT = [
+/** Instruction for `bilingual`: the original sentence, then its translation. */
+const SYSTEM_PROMPT_BILINGUAL = [
   'You turn a Markdown document into a bilingual reading copy: the original English followed by its Simplified Chinese translation, sentence by sentence.',
   'Walk the document in order.',
   'For every sentence of natural-language prose, output the original sentence unchanged on its own line, then its natural Simplified Chinese translation on the very next line.',
@@ -60,6 +62,34 @@ const SYSTEM_PROMPT = [
   'Never translate code, identifiers, file paths, URLs, command names, configuration keys, or Latin-script proper nouns.',
   'Output only the transformed document — no preamble, no commentary, no summary, and no code fence around the whole document.',
 ].join(' ')
+
+/** Instruction for `zh`: the same document, Chinese only, no original text kept. */
+const SYSTEM_PROMPT_ZH = [
+  'You translate a Markdown document into Simplified Chinese.',
+  'Walk the document in order.',
+  'Output the translated document alone: every sentence of natural-language prose becomes natural Simplified Chinese, and the original text is not repeated anywhere.',
+  'Keep the Markdown structure where it is: heading markers, list markers, blockquote markers and table pipes all stay in place.',
+  'A heading stays one heading: translate its text and keep the same markers.',
+  'A line holding only a token like <!--KEEP:0--> is a protected region: reproduce that token unchanged, exactly once, on its own line, in its original position.',
+  'Never translate, reflow, wrap in backticks, indent or comment on a protected token.',
+  'Never translate code, identifiers, file paths, URLs, command names, configuration keys, or Latin-script proper nouns.',
+  'Output only the translated document — no preamble, no commentary, no summary, and no code fence around the whole document.',
+].join(' ')
+
+/** The two renderings this plugin offers, and the sibling each one writes. */
+const MODES = {
+  bilingual: { suffix: '-cn', system: SYSTEM_PROMPT_BILINGUAL },
+  zh: { suffix: '-zh', system: SYSTEM_PROMPT_ZH },
+}
+
+/**
+ * Read the mode off a request body.
+ * @param value - the `mode` field as it arrived.
+ * @returns `'zh'`, or `'bilingual'` for anything else, including a missing field.
+ */
+function readMode(value) {
+  return value === 'zh' ? 'zh' : 'bilingual'
+}
 
 /**
  * Decode a `/`-joined address tail back into one path.
@@ -97,32 +127,34 @@ export function parseFileAddress(address) {
 }
 
 /**
- * Insert `-cn` before the final suffix of a path's last segment.
+ * Insert a marker before the final extension of a path's last segment.
  * @param path - the source path, POSIX or Windows separators.
- * @returns the sibling path for the translation; a name with no suffix gains a plain `-cn`.
+ * @param suffix - the marker to insert, e.g. `-cn`.
+ * @returns the sibling path; a name with no extension gains the marker as-is.
  */
-export function chineseSiblingPath(path) {
+export function siblingPath(path, suffix) {
   const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   const directory = cut >= 0 ? path.slice(0, cut + 1) : ''
   const base = cut >= 0 ? path.slice(cut + 1) : path
   const dot = base.lastIndexOf('.')
-  if (dot <= 0) return `${directory}${base}-cn`
-  return `${directory}${base.slice(0, dot)}-cn${base.slice(dot)}`
+  if (dot <= 0) return `${directory}${base}${suffix}`
+  return `${directory}${base.slice(0, dot)}${suffix}${base.slice(dot)}`
 }
 
 /**
- * The address of the translation, derived from the source address itself so its
+ * The address of a sibling, derived from the source address itself so its
  * encoding and scope are preserved byte for byte.
  * @param address - the source file's address.
+ * @param suffix - the marker to insert, e.g. `-cn`.
  * @returns the sibling address.
  */
-export function chineseSiblingAddress(address) {
+export function siblingAddress(address, suffix) {
   const cut = address.lastIndexOf('/')
   const head = cut >= 0 ? address.slice(0, cut + 1) : ''
   const base = cut >= 0 ? address.slice(cut + 1) : address
   const dot = base.lastIndexOf('.')
-  if (dot <= 0) return `${head}${base}-cn`
-  return `${head}${base.slice(0, dot)}-cn${base.slice(dot)}`
+  if (dot <= 0) return `${head}${base}${suffix}`
+  return `${head}${base.slice(0, dot)}${suffix}${base.slice(dot)}`
 }
 
 /**
@@ -244,14 +276,15 @@ function sendJson(res, status, payload) {
 }
 
 /**
- * Build the bilingual document for one source document.
+ * Build the rendered document for one source document.
  * @param ctx - the plugin context.
  * @param source - the whole source document.
  * @param sessionId - the Session the request is attributed to.
- * @returns the bilingual document text.
+ * @param mode - `'bilingual'` or `'zh'`; picks the instructions and the shape of the output.
+ * @returns the rendered document text.
  * @throws when the model call fails, yields no text, or breaks a protected region.
  */
-async function translateBilingual(ctx, source, sessionId) {
+async function translateDocument(ctx, source, sessionId, mode) {
   const protectedSource = protectVerbatim(source)
   if (protectedSource.text.length > MAX_INPUT_CHARS) {
     throw new Error(`the document is longer than ${MAX_INPUT_CHARS} characters; translate a smaller file`)
@@ -261,7 +294,7 @@ async function translateBilingual(ctx, source, sessionId) {
   const options = {
     provider: selection.provider,
     model: selection.model,
-    system: SYSTEM_PROMPT,
+    system: MODES[mode].system,
     messages: [
       {
         id: `to-chinese-${Date.now().toString(36)}`,
@@ -303,6 +336,8 @@ async function handleTranslate(ctx, req, res) {
     return
   }
 
+  const mode = readMode(body?.mode)
+
   const parsed = parseFileAddress(body?.address)
   if (parsed === undefined) {
     sendJson(res, 400, { ok: false, error: 'expected a dsh-resource://file/ address' })
@@ -331,18 +366,19 @@ async function handleTranslate(ctx, req, res) {
     return
   }
 
-  const bilingual = await translateBilingual(ctx, source, session?.id)
+  const rendered = await translateDocument(ctx, source, session?.id, mode)
 
-  const outputPath = chineseSiblingPath(parsed.path)
+  const suffix = MODES[mode].suffix
+  const outputPath = siblingPath(parsed.path, suffix)
   const outputTarget = await ctx.fs.resolve(outputPath, resolveOptions)
   const policy = ctx.sandboxPolicy.resolve(session === undefined ? undefined : { session })
-  const outcome = await ctx.fs.writeText(outputTarget, bilingual, undefined, undefined, policy)
+  const outcome = await ctx.fs.writeText(outputTarget, rendered, undefined, undefined, policy)
 
   sendJson(res, 200, {
     ok: true,
-    address: chineseSiblingAddress(body.address),
+    address: siblingAddress(body.address, suffix),
     path: outcome?.displayPath ?? outputTarget.displayPath,
-    bytes: Buffer.byteLength(bilingual, 'utf8'),
+    bytes: Buffer.byteLength(rendered, 'utf8'),
   })
 }
 

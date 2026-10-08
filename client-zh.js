@@ -1,31 +1,27 @@
 /**
- * dsh-to-chinese — Client (browser) half.
+ * dsh-to-chinese —— 客户端（浏览器）部分。
  *
- * Contributes three things:
+ * 它贡献三样东西：
  *
- * 1. Two rows in a document tab's actions menu (`sidebar.right.tab.menu.item`):
- *    "To Chinese" writes the Chinese text alone, "To Chinese (bilingual)" writes
- *    the sentence-by-sentence reading copy. The seat hands each entry the tab it
- *    belongs to plus `dismiss`, so the entry renders the whole row itself and
- *    decides its own visibility from `tab.contentId`: it offers nothing on a tab
- *    that is not a file. Each row restates the cell the menu already draws for
- *    itself (`DockKit.module.css` `.menuItem`) so it reads as one of the menu's
- *    own rows.
+ * 1. 文档标签页操作菜单（`sidebar.right.tab.menu.item`）中的两行：
+ *    "To Chinese" 只写出中文文本，"To Chinese (bilingual)" 写出逐句对照的阅读稿。
+ *    座位会把每个条目所属的标签页连同 `dismiss` 一起交给它，因此条目自行渲染整行，
+ *    并根据 `tab.contentId` 决定自己的可见性：对于不是文件的标签页，它什么都不提供。
+ *    每一行都复述菜单本身已经为自己绘制的单元格（`DockKit.module.css` 的 `.menuItem`）：
+ *    同样的内边距、同样的圆角、同样的字号、同样的悬停填充，因此它读起来就像
+ *    菜单自己的一行。
  *
- * 2. One page tab type per mode (`to-chinese`, `to-chinese-zh`) with its own
- *    body, registered in the two
- *    public stages the preview plugin also uses: the declaration through
- *    `ctx.sidebarRightTabs.register`, the body through the keyed
- *    `sidebar.right.pane.tab` slot, joined by this plugin's id. The tab — not a
- *    corner toast — is where the work reports itself: it opens immediately and
- *    shows progress, then hands itself over to the document preview with
- *    `openResource(result, { replaceTab: true })` so the finished bilingual file
- *    opens in the very slot the user was already watching. A failure stays in
- *    the tab, with its reason and a retry — nothing is written to disk for a
- *    translation that never completed.
+ * 2. 每种模式一个页签类型（`to-chinese`、`to-chinese-zh`），各自带有自己的主体，
+ *    并在预览插件同样使用的两个公开阶段中注册：声明通过
+ *    `ctx.sidebarRightTabs.register` 完成，主体通过带键的 `sidebar.right.pane.tab`
+ *    插槽完成，两者由本插件的 id 连接起来。工作汇报自己的地方是这个标签页，
+ *    而不是角落里的 toast：它立即打开并显示进度，然后用
+ *    `openResource(result, { replaceTab: true })` 把自己交给文档预览，
+ *    好让完成后的中英对照文件正好在用户一直盯着的那个槽位里打开。失败会留在
+ *    标签页里，连同原因和一次重试——对于始终没有完成的翻译，不会向磁盘写入任何东西。
  *
- * 3. A fallback pill in `shell.overlay`, used only when the tab cannot be opened
- *    at all (a wiring fault): the failure still has somewhere to appear.
+ * 3. `shell.overlay` 中的一个兜底胶囊提示，仅在标签页完全无法打开时
+ *    （接线故障）使用：失败仍然有地方可以现身。
  *
  * @module dsh-to-chinese/client
  */
@@ -36,10 +32,10 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
 
-    /** Locale namespace carrying this plugin's copy. */
+    /** 承载本插件文案的语言区域命名空间。 */
     const LOCALE_NS = 'toChinese'
 
-    /** Dictionaries for the namespace; English is the fallback. */
+    /** 该命名空间的词典；英文是回退项。 */
     const DICTS = {
       en: {
         action: 'To Chinese (bilingual)',
@@ -71,12 +67,12 @@ window.__ModuleLoader__.load({
       },
     }
 
-    /** The Host route this plugin owns. */
+    /** 本插件拥有的 Host 路由。 */
     const ROUTE = '/to-chinese/translate'
 
     /**
-     * The two renderings this plugin offers. Each mode is one menu row, one tab
-     * kind, and one body slot key, so both can be open side by side.
+     * 本插件提供的两种呈现。每种模式对应一个菜单行、一个标签页种类和一个主体插槽键，
+     * 因此两者可以并排打开。
      */
     const MODES = {
       bilingual: {
@@ -97,16 +93,16 @@ window.__ModuleLoader__.load({
       },
     }
 
-    /** Menu row order: the Chinese-only row sits above the bilingual one. */
+    /** 菜单行顺序：仅中文那一行位于中英对照那一行之上。 */
     const MENU_ORDER = { zh: 50, bilingual: 60 }
 
-    /** The address prefix that identifies a tab as a file. */
+    /** 用来把标签页标识为文件的地址前缀。 */
     const FILE_ADDRESS_PREFIX = 'dsh-resource://file/'
 
-    /** Stable mask identity: every instance draws the same knock-out, so it may be shared. */
+    /** 稳定的遮罩标识：每个实例绘制的镂空图案都相同，因此可以共享。 */
     const MASK_ID = 'dsh-to-chinese-badge'
 
-    /** The badge's knock-out outline: 文 upper-left, A lower-right, inside a 16px square. */
+    /** 徽标的镂空轮廓：文在左上、A 在右下，位于 16px 的正方形之内。 */
     const GLYPH_PATH = [
       'M4.5 3.2 L6.1 3.2',
       'M2.2 4.8 L8.2 4.8',
@@ -117,11 +113,11 @@ window.__ModuleLoader__.load({
     ].join(' ')
 
     /**
-     * Component-local styles; rendered as an element so unmounting removes them.
-     * The `.dsh-to-chinese-item` rule restates the row the host's tab-menu already
-     * draws for itself (`DockKit.module.css` `.menuItem`): same padding, same
-     * radius, same type size, same hover fill — so a row contributed here reads as
-     * one of the menu's own entries rather than a foreign control.
+     * 组件本地样式；以元素形式渲染，这样卸载时它们会被一并移除。
+     * `.dsh-to-chinese-item` 规则复述了宿主标签页菜单已经为自己绘制的那一行
+     * （`DockKit.module.css` 的 `.menuItem`）：同样的内边距、同样的圆角、
+     * 同样的字号、同样的悬停填充——因此这里贡献的行读起来就像菜单自己的条目，
+     * 而不是一个外来控件。
      */
     const CSS = `
 .dsh-to-chinese-item {
@@ -210,7 +206,7 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
   line-height: 18px;
-  /* The overlay layer is click-through; the pill opts back in to be dismissable. */
+  /* 浮层是点击穿透的；胶囊提示重新开启指针事件，以便可以被关闭。 */
   pointer-events: auto;
 }
 .dsh-to-chinese-pillText {
@@ -240,9 +236,9 @@ window.__ModuleLoader__.load({
 `
 
     /**
-     * The translate badge: a filled rounded square with 文 and A knocked out of
-     * it, so the glyphs show whatever is behind them in either theme.
-     * @returns the icon element.
+     * 翻译徽标：一个填充的圆角方块，从中镂去 文 和 A，
+     * 这样无论哪种主题，字形都会透出它们背后的内容。
+     * @returns 图标元素。
      */
     function TranslateBadge() {
       return h(
@@ -265,9 +261,9 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The file address a menu entry was opened for.
-     * @param tab - the tab the menu belongs to.
-     * @returns the `dsh-resource://file/…` address, or `null` for anything else.
+     * 某个菜单条目所针对的文件地址。
+     * @param tab - 菜单所属的标签页。
+     * @returns `dsh-resource://file/…` 地址；其他情况返回 `null`。
      */
     function fileAddressOf(tab) {
       const contentId = tab === null || tab === undefined ? undefined : tab.contentId
@@ -276,9 +272,9 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The last path segment of an address, decoded, for display.
-     * @param address - the file address.
-     * @returns a short readable name, or the address itself when it cannot be read.
+     * 地址的最后一个路径段，解码后用于显示。
+     * @param address - 文件地址。
+     * @returns 简短可读的名称；无法读取时返回地址本身。
      */
     function displayName(address) {
       if (typeof address !== 'string' || address === '') return ''
@@ -291,12 +287,11 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Read one key through the locale service, falling back to the shipped
-     * English copy whenever the namespace is unregistered or the dictionary has
-     * no entry — an unbound key comes back as the key itself.
-     * @param locale - the client locale service, when mounted.
-     * @param key - dictionary key.
-     * @returns the copy to show.
+     * 通过语言区域服务读取一个键；当命名空间未注册或词典中没有对应条目时，
+     * 回退到随附的英文文案——未绑定的键会原样返回该键本身。
+     * @param locale - 客户端语言区域服务（若已挂载）。
+     * @param key - 词典键。
+     * @returns 要显示的文案。
      */
     function copy(locale, key) {
       if (locale !== undefined) {
@@ -311,9 +306,9 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The one failure message the fallback pill reads. The tab carries its own
-     * state; this only covers a failure that happened before a tab existed.
-     * @returns the store: a snapshot reader, a subscriber, and the writer.
+     * 兜底胶囊提示读取的那一条失败消息。标签页自带状态；
+     * 这里只覆盖在标签页出现之前就发生的失败。
+     * @returns 该存储：一个快照读取器、一个订阅者，以及写入器。
      */
     function createErrorStore() {
       let message = ''
@@ -342,7 +337,7 @@ window.__ModuleLoader__.load({
               try {
                 disposers.push(locale.register(LOCALE_NS, id, DICTS[id]))
               } catch (error) {
-                // Copy is cosmetic: a rejected dictionary must not take the plugin down with it.
+                // 文案只是装饰性的：一份被拒绝的词典不该把插件一起拖垮。
                 console.error('[to-chinese] dictionary registration failed', error)
               }
             }
@@ -354,7 +349,7 @@ window.__ModuleLoader__.load({
 
         const errors = createErrorStore()
 
-        /** Re-render on locale registration and locale switches. */
+        /** 在语言区域注册和语言区域切换时重新渲染。 */
         function useLocaleRevision() {
           const [revision, setRevision] = React.useState(0)
           React.useEffect(() => {
@@ -365,7 +360,7 @@ window.__ModuleLoader__.load({
           return revision
         }
 
-        /** Follow the fallback-only error store. */
+        /** 订阅只服务于兜底路径的错误存储。 */
         function useError() {
           const [message, setMessage] = React.useState(errors.get)
           React.useEffect(() => errors.subscribe(() => setMessage(errors.get())), [])
@@ -375,10 +370,10 @@ window.__ModuleLoader__.load({
         const t = (key) => copy(ctx.get('locale'), key)
 
         /**
-         * Ask the Host to translate one document.
-         * @param address - the document's `dsh-resource://file/…` address.
-         * @param mode - `'bilingual'` or `'zh'`: which rendering to write.
-         * @returns the Host payload carrying the finished file's address.
+         * 请 Host 翻译一个文档。
+         * @param address - 文档的 `dsh-resource://file/…` 地址。
+         * @param mode - `'bilingual'` 或 `'zh'`：要写入哪一种呈现。
+         * @returns 携带成品文件地址的 Host 载荷。
          */
         async function translate(address, mode) {
           const response = await fetch(ROUTE, {
@@ -392,12 +387,11 @@ window.__ModuleLoader__.load({
         }
 
         /**
-         * Open a translation tab for one document. Everything after this point
-         * belongs to the tab; only a failure to open one lands in the pill. The
-         * mode picks the tab kind, so the two renderings of one file can be open
-         * side by side.
-         * @param address - the document's `dsh-resource://file/…` address.
-         * @param mode - `'bilingual'` or `'zh'`.
+         * 为一个文档打开翻译标签页。此后的所有事情都属于这个标签页；
+         * 只有打开标签页本身的失败才会落进胶囊提示里。模式决定标签页种类，
+         * 因此同一个文件的两种呈现可以并排打开。
+         * @param address - 文档的 `dsh-resource://file/…` 地址。
+         * @param mode - `'bilingual'` 或 `'zh'`。
          */
         function openTranslateTab(address, mode) {
           try {
@@ -410,8 +404,8 @@ window.__ModuleLoader__.load({
         }
 
         /**
-         * The body of one translation tab: it runs the job for the address it was
-         * opened with, then replaces itself with the document it produced.
+         * 单个翻译标签页的主体：它针对打开时带入的地址跑完任务，
+         * 然后用自己产出的文档把自己替换掉。
          */
         function TranslateTab(props) {
           useLocaleRevision()
@@ -435,8 +429,7 @@ window.__ModuleLoader__.load({
               .then((payload) => {
                 if (!live) return
                 setState({ phase: 'done', message: '' })
-                // Hand the slot over: the document preview opens the finished
-                // file exactly where this tab was.
+                // 交出槽位：文档预览会在本标签页原来的位置上打开成品文件。
                 tab.actions.openResource(payload.address, { replaceTab: true })
               })
               .catch((error) => {
@@ -486,7 +479,7 @@ window.__ModuleLoader__.load({
           )
         }
 
-        /** One row in a tab's actions menu; renders nothing for a tab that is not a file. */
+        /** 标签页操作菜单中的一行；对于不是文件的标签页不做任何渲染。 */
         function TabMenuEntry(props) {
           useLocaleRevision()
           const mode = props.mode === 'zh' ? 'zh' : 'bilingual'
@@ -495,8 +488,8 @@ window.__ModuleLoader__.load({
           return h(
             React.Fragment,
             null,
-            // The row is rendered inside the kit's own menu, away from this plugin's
-            // other surfaces, so its cell styles travel with it.
+            // 这一行渲染在工具包自己的菜单内部，远离本插件的其他界面，
+            // 因此它的单元格样式随它一起走。
             h('style', { key: 'styles' }, CSS),
             h(
               'button',
@@ -506,7 +499,7 @@ window.__ModuleLoader__.load({
                 role: 'menuitem',
                 className: 'dsh-to-chinese-item',
                 onClick: () => {
-                  // The menu belongs to the kit: an acting entry closes it itself.
+                  // 菜单属于工具包：执行动作的条目自行关闭它。
                   props.dismiss()
                   openTranslateTab(address, mode)
                 },
@@ -516,12 +509,12 @@ window.__ModuleLoader__.load({
           )
         }
 
-        /** The Chinese-only row: the same cell, rendered for the other mode. */
+        /** 仅中文的那一行：同一个单元格，为另一种模式渲染。 */
         function ZhTabMenuEntry(props) {
           return h(TabMenuEntry, { tab: props.tab, dismiss: props.dismiss, mode: 'zh' })
         }
 
-        /** The fallback surface, shown only when a translation tab could not be opened. */
+        /** 兜底界面，仅在翻译标签页无法打开时显示。 */
         function FallbackPill() {
           useLocaleRevision()
           const message = useError()
@@ -550,7 +543,7 @@ window.__ModuleLoader__.load({
           )
         }
 
-        // Stage 1 — the declarations: what handles each kind, and what its chip says.
+        // 阶段 1 —— 声明：每种种类由谁负责，以及它的标签上写什么。
         ctx.effect(
           () =>
             ctx.sidebarRightTabs.register({
@@ -570,8 +563,8 @@ window.__ModuleLoader__.load({
           'to-chinese zh tab type',
         )
 
-        // Stage 2 — the implementations: one body per type id. Both are the same
-        // component; the mode travels in the tab's own navigation params.
+        // 阶段 2 —— 实现：每个类型 id 一个主体。两者是同一个组件；
+        // 模式随标签页自己的导航参数一起传递。
         ctx.slots.inject('sidebar.right.pane.tab', () =>
           ctx.slots.register({ name: 'sidebar.right.pane.tab', key: MODES.bilingual.typeId }, TranslateTab),
         )
@@ -579,7 +572,7 @@ window.__ModuleLoader__.load({
           ctx.slots.register({ name: 'sidebar.right.pane.tab', key: MODES.zh.typeId }, TranslateTab),
         )
 
-        // Stage 3 — the rows: the Chinese-only rendering first, then the bilingual one.
+        // 阶段 3 —— 菜单行：先是仅中文的呈现，然后是中英对照的呈现。
         ctx.slots.inject('sidebar.right.tab.menu.item', () =>
           ctx.slots.register(
             {

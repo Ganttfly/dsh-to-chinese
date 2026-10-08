@@ -5,6 +5,20 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Added
+
+- 菜单新增「To Chinese」动作：只保留中文译文，写入 `-zh` 副本
+- 两种译文各有独立的标签页类型，同一文件的「纯中文」与「中英对照」可以并排打开
+
+### Changed
+
+- 「翻译成中文（中英对照）」改名为「To Chinese (bilingual)」，行为不变（仍写 `-cn`），并排在「To Chinese」下面
+- 菜单行样式改为照抄 dockkit 标签菜单自己的 `.menuItem`：与 Kit 自带的「Close」行完全同款（此前照抄的是另一套菜单单元格，行高、字号、圆角都偏大，且行内多一个图标）
+- Host 侧 `chineseSiblingPath` / `chineseSiblingAddress` 泛化为 `siblingPath(path, suffix)` / `siblingAddress(address, suffix)`
+- 翻译请求体新增 `mode` 字段；缺省仍是 `bilingual`，只发 `address` 的旧客户端行为不变
+
 ## [1.0.0] - 2026-09-18
 
 首个公开版本。
